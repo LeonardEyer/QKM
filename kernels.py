@@ -10,17 +10,17 @@ def K_classical(sigma):
     return k
 
 
-def make_kernel(psi, N, qml_backend='default.qubit',**backend_options):
+def make_kernel(psi, N, diff_method="best", qml_backend='default.qubit',**backend_options):
     """
     Make a quantum kernel from a quantum feature map psi with N qubits.
     """
     dev = qml.device(qml_backend, wires=N, **backend_options)
 
     def k(x, y):
-        @qml.qnode(dev, interface="autograd", diff_method="backprop")
+        @qml.qnode(dev, interface="autograd", diff_method=diff_method)
         def kernel_circuit(x, y):
-            psi(x)
-            qml.adjoint(psi)(y)
+            psi(y)
+            qml.adjoint(psi)(x)
             return qml.probs(wires=range(N))
 
         return kernel_circuit(x, y)[0]
@@ -92,18 +92,18 @@ def K_layered(N, n_layers, **kwargs):
     return make_kernel(U, N, **kwargs)
 
 
-def K_L_prod(N, n_layers, **kwargs):
+def K_L_prod(N, n_layers, HEA=qml.StronglyEntanglingLayers, **kwargs):
     """
     A single layered product feature map with $|\\psi(x)\\rangle = U(x)V|0\\rangle$
     where $V$ is a HEA of depth five with randomized parameters which are set throughout training
     and $U(x)=\\prod_{j}^{N}(R^{j}_X(x))$
     """
-    shape = qml.StronglyEntanglingLayers.shape(n_layers=5, n_wires=N)
+    shape = HEA.shape(n_layers=5, n_wires=N)
 
     weights = [np.random.random(size=shape) for _ in range(n_layers)]
 
     def V(params):
-        qml.StronglyEntanglingLayers(params, wires=range(N))
+        HEA(params, wires=range(N))
 
     def U(x):
         for j in range(N):
@@ -156,6 +156,30 @@ def K_L_cheb(N, n_layers, **kwargs):
     def U(x):
         for j in range(N):
             qml.RX(j * np.arccos(x), wires=j)
+
+    def psi(x):
+        for weight in weights:
+            V(weight)
+            U(x)
+
+    return make_kernel(psi, N, **kwargs)
+
+
+def K_L_tower_HA(N, n_layers, HEA=qml.BasicEntanglerLayers, **kwargs):
+    """
+        A single layered product feature map with $|\\psi(x)\\rangle = U(x)V|0\\rangle$
+        where $V$ is a HEA of depth five with randomized parameters which are set throughout training
+        and $U(x)=\\prod_{j}^{N}(R^{j}_X(j * x))$
+        """
+    shape = HEA.shape(n_layers=5, n_wires=N)
+    weights = [np.random.random(size=shape) for _ in range(n_layers)]
+
+    def V(params):
+        HEA(params, wires=range(N))
+
+    def U(x):
+        for j in range(N):
+            qml.RX(j * x, wires=j)
 
     def psi(x):
         for weight in weights:

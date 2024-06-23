@@ -42,7 +42,6 @@ def mmr(X, Y, F, K, method='Newton-CG'):
         return qml.jacobian(loss_function)(alphas)
 
     losses = []
-
     def collect_losses_callback(intermediate_result):
         losses.append(intermediate_result.fun)
 
@@ -58,6 +57,89 @@ def mmr(X, Y, F, K, method='Newton-CG'):
         return trial_function(x, a, b)
 
     return optimized_trial_function, losses
+
+
+def mmr_DE(DE, data, x0, f0, k, method='Newton-CG'):
+    x_data = np.array(data[0])
+    y_data = np.array(data[1])
+
+    k_at_initial_condition = np.zeros(len(x_data))
+    for i in range(len(x_data)):
+        k_at_initial_condition[i] = k(x0, y_data[i])
+
+    def f0_trial(a, b):
+        result = 0
+        result += b
+        for i in range(len(a)):
+            result += a[i] * k_at_initial_condition[i]
+        return result
+
+    def K_grad(x, y):
+        params = np.array([x, y], requires_grad=True)
+        return qml.jacobian(k, argnum=[0])(params[0], params[1])[0]
+
+    k_evaluated_at_data_points = np.zeros((len(x_data), len(x_data)))
+    dk_dx_evaluated_at_data_points = np.zeros((len(x_data), len(x_data)))
+    for i in range(len(x_data)):
+        for j in range(len(x_data)):
+
+            x_i = x_data[i]
+            x_j = x_data[j]
+
+            dk_dx_evaluated_at_data_points[i, j] = K_grad(x_i, x_j)
+            k_evaluated_at_data_points[i, j] = k(x_i, x_j)
+
+    def trial_function_evaluated_at_data_points(a, b):
+        result = np.zeros_like(a)
+        result += b
+        for i in range(len(a)):
+            result += a[i] * k_evaluated_at_data_points[:, i]
+        return result
+
+    def dx_trial_function_evaluated_at_data_points(a, b):
+        result = np.zeros_like(a)
+        for i in range(len(a)):
+            result += a[i] * dk_dx_evaluated_at_data_points[:, i]
+        return result
+
+    def trial_function(x, a, b):
+        result = b
+        for i in range(len(a)):
+            result += a[i] * k(x, y_data[i])
+        return result
+
+    def loss_function(alphas):
+        b = alphas[0]
+        a = alphas[1:]
+        result = (f0 - f0_trial(a, b)) ** 2
+        f_trial = trial_function_evaluated_at_data_points(a, b)
+        df_dx_trial = dx_trial_function_evaluated_at_data_points(a, b)
+        for i in range(len(x_data)):
+            result += DE(x_data[i], f_trial[i], df_dx_trial[i]) ** 2
+        return result
+
+
+    losses = []
+    def collect_losses_callback(intermediate_result):
+        losses.append(intermediate_result.fun)
+        if len(losses) % 5 == 0:
+            print("Loss: ", intermediate_result.fun)
+
+    def grad_function(alphas):
+        alphas = np.array(alphas, requires_grad=True)
+        return qml.jacobian(loss_function)(alphas)
+
+    x0 = np.array([np.sum(y_data) / len(y_data), *np.zeros_like(y_data)], requires_grad=True)
+    res = scipy.optimize.minimize(loss_function, x0, jac=grad_function, method=method,
+                                  callback=collect_losses_callback, options={'disp': True}).x
+
+    b = res[0]
+    a = res[1:]
+
+    def optimized_trial_function(x):
+        return trial_function(x, a, b)
+
+    return optimized_trial_function
 
 
 def multivalued_mmr_DE(DE, data, x0, f0, K, IC_weight=1, method='Newton-CG'):
@@ -136,8 +218,11 @@ def multivalued_mmr_DE(DE, data, x0, f0, K, IC_weight=1, method='Newton-CG'):
         alphas = np.array(alphas, requires_grad=True)
         return qml.jacobian(loss_function)(alphas)
 
+    def print_loss_callback(intermediate_result):
+        print("Loss: ", intermediate_result.fun)
+
     minimization = scipy.optimize.minimize(
-        loss_function, a0, jac=grad_function, method=method, callback=None, options={'disp': True}).x
+        loss_function, a0, jac=grad_function, method=method, callback=print_loss_callback, options={'disp': True}).x
 
     b = minimization[:m]
     a = np.array(minimization[m:])

@@ -5,7 +5,7 @@ from sklearn.svm import SVR
 from sklearn.model_selection import GridSearchCV
 
 
-def quantum_dataset():
+def quantum_dataset(n_samples=100):
     # Define constants
     J = 1.0  # Exchange interaction
     hz = 0.2 * J  # External magnetic field
@@ -50,7 +50,7 @@ def quantum_dataset():
     psi0 = psi0.unit()
 
     # Time evolution parameters
-    times = np.linspace(0, 10, 51)  # Time range and resolution
+    times = np.linspace(0, 10, n_samples)  # Time range and resolution
 
     # Observables: Z for each qubit
     observables = [qt.tensor([Z if j == i else I for j in range(N)]) for i in range(N)]
@@ -67,6 +67,47 @@ def quantum_dataset():
     return dataset
 
 
+def plot_mmr_results(training_data, optimized, errors, losses, save=False):
+    """
+    training_data: tuple of (x, y) for the training data.
+    optimized: dictionary with keys as model names and values as tuple of (x, y)
+    errors: dictionary with keys as model names and values as tuple of (x, error)
+    losses: dictionary with keys as model names and values as losses
+    """
+    fig, axs = plt.subplots(3, 1, figsize=(8, 8))
+
+    # Plot (a) - Training data and optimized trial functions
+    axs[0].plot(training_data[0], training_data[1], '.', label='data')
+    for model_name, (x, y) in optimized.items():
+        axs[0].plot(x, y, label=model_name)
+    axs[0].set_xlabel('x')
+    axs[0].set_ylabel('f(x)')
+    axs[0].legend(loc='upper right')
+    #axs[0].grid(True)
+
+    # Error plots
+    for model_name, (x, error) in errors.items():
+        axs[1].plot(x, error, label=model_name)
+    axs[1].set_xlabel('x')
+    axs[1].set_ylabel('error')
+    axs[1].legend(loc='upper right')
+    #axs[1].grid(True)
+
+
+    # Losses plots
+    for model_name, loss in losses.items():
+        axs[2].plot(loss, label=model_name)
+    axs[2].set_xlabel('epoch')
+    axs[2].set_ylabel('loss')
+    axs[2].set_yscale('log')
+    axs[2].legend(loc='upper right')
+    #axs[1].grid(True)
+
+    if save:
+        plt.savefig(f"data/mmr_results.png", transparent=True)
+    else:
+        plt.show()
+
 def plot_results(training_data, svr_qk, errors, losses):
     """
     Function to plot the given training data, SVR predictions, errors, and losses.
@@ -74,7 +115,7 @@ def plot_results(training_data, svr_qk, errors, losses):
     Parameters:
     - training_data: tuple of (x, y) for the training data.
     - svr_qk: tuple of (x, y) for the SVR QK predictions.
-    - errors: dictionary with keys as model names and values as tuples of (x, error).
+    - errors:
     - losses: dictionary with keys as model names and values as tuples of (epoch, loss).
     """
     fig, axs = plt.subplots(3, 1, figsize=(10, 15))
@@ -128,7 +169,7 @@ def gram_generator(kernel):
 def get_best_params(kernel, x, y):
     param_grid = {
         'C': [1, 10, 100, 1000],
-        'gamma': [0.1, 1, 10, 100],
+        'gamma': [0.1, 1, 10, 100, 10**5],
         'epsilon': [0.1, 0.01, 0.001]
     }
 
