@@ -139,7 +139,7 @@ def mmr_DE(DE, data, x0, f0, k, method='Newton-CG'):
     def optimized_trial_function(x):
         return trial_function(x, a, b)
 
-    return optimized_trial_function
+    return optimized_trial_function, losses
 
 
 def multivalued_mmr_DE(DE, data, x0, f0, K, IC_weight=1, method='Newton-CG'):

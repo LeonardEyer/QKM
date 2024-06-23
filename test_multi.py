@@ -33,7 +33,7 @@ def variance_parallel(f, params, N):
 def variance_over_range(f, N, N_repeat, extent=2 * np.pi):
     values = tqdm([(x, y) for x in np.linspace(0, extent, N) for y in np.linspace(0, extent, N)])
 
-    res = np.array(list(map(lambda p: variance_parallel(f, p, N_repeat), values)))
+    res = np.array(list(map(lambda p: variance(f, p, N_repeat), values)))
     return np.var(res)
 
 
@@ -45,7 +45,7 @@ trial_kernels = {
 }
 
 if __name__ == "__main__":
-    for (label, kernel) in trial_kernels.items():
-        k = kernel(8, n_layers=2, qml_backend="qiskit.aer", diff_method="parameter-shift")
-        f = make_gradient_kernel(k)
-        print(f"Variance of {label} kernel: {variance_over_range(f=f, N=10, N_repeat=10)}")
+    k = K_L_prod(8, n_layers=2, qml_backend="qiskit.aer", diff_method="best")
+    f = make_gradient_kernel(k)
+    f([0., 0.])
+    #print(f"Variance of L-prod kernel: {variance_over_range(f=f, N=10, N_repeat=1)}")
