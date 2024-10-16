@@ -67,7 +67,7 @@ def quantum_dataset(n_samples=100):
     return dataset
 
 
-def plot_mmr_results(training_data, optimized, errors, losses, save=False):
+def plot_mmr_results(training_data, optimized, errors, losses, label, save=False):
     """
     training_data: tuple of (x, y) for the training data.
     optimized: dictionary with keys as model names and values as tuple of (x, y)
@@ -77,16 +77,18 @@ def plot_mmr_results(training_data, optimized, errors, losses, save=False):
     fig, axs = plt.subplots(3, 1, figsize=(8, 8))
 
     # Plot (a) - Training data and optimized trial functions
-    axs[0].plot(training_data[0], training_data[1], '.', label='data')
-    for model_name, (x, y) in optimized.items():
+    for model_name in sorted(optimized):
+        x, y = optimized[model_name]
         axs[0].plot(x, y, label=model_name)
+    axs[0].plot(training_data[0], training_data[1], 'b.', label='data')
     axs[0].set_xlabel('x')
     axs[0].set_ylabel('f(x)')
     axs[0].legend(loc='upper right')
     #axs[0].grid(True)
 
     # Error plots
-    for model_name, (x, error) in errors.items():
+    for model_name in sorted(errors):
+        x, error = errors[model_name]
         axs[1].plot(x, error, label=model_name)
     axs[1].set_xlabel('x')
     axs[1].set_ylabel('error')
@@ -95,7 +97,8 @@ def plot_mmr_results(training_data, optimized, errors, losses, save=False):
 
 
     # Losses plots
-    for model_name, loss in losses.items():
+    for model_name in sorted(losses):
+        loss = losses[model_name]
         axs[2].plot(loss, label=model_name)
     axs[2].set_xlabel('epoch')
     axs[2].set_ylabel('loss')
@@ -104,7 +107,7 @@ def plot_mmr_results(training_data, optimized, errors, losses, save=False):
     #axs[1].grid(True)
 
     if save:
-        plt.savefig(f"data/mmr_results.png", transparent=True)
+        plt.savefig(f"data/mmr_results_{label}.png", transparent=True)
     else:
         plt.show()
 
